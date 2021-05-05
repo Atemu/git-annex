@@ -5,6 +5,8 @@
  - License: BSD-2-clause
  -}
 
+{-# LANGUAGE CPP #-}
+
 module Utility.CopyFile (
 	copyFileExternal,
 	copyCoW,
@@ -34,6 +36,32 @@ copyMetaDataParams meta = map snd $ filter fst
   where
 	allmeta = meta == CopyAllMetaData
 
+{- Handle using the system's cp for reflinking on macOS -}
+cpExe :: String
+cpExe =
+#ifdef WITH_SYSTEMCP
+	"/bin/cp"
+#else
+	"cp"
+#endif
+reflinkParam :: String
+reflinkParam =
+#ifdef WITH_SYSTEMCP
+	"-c"
+#else
+	"--reflink=always"
+#endif
+
+{- The system cp does not support the --reflink flag that is tested for -}
+reflinkSupported :: Bool
+reflinkSupported =
+#ifdef WITH_SYSTEMCP
+	True
+#else
+	BuildInfo.cp_reflink_supported
+#endif
+
+
 {- The cp command is used, because I hate reinventing the wheel,
  - and because this allows easy access to features like cp --reflink
  - and preserving metadata. -}
@@ -42,23 +70,23 @@ copyFileExternal meta src dest = do
 	-- Delete any existing dest file because an unwritable file
 	-- would prevent cp from working.
 	void $ tryIO $ removeFile dest
-	boolSystem "cp" $ params ++ [File src, File dest]
+	ok <- copyCoW meta src dest
+	if ok
+	then return ok
+	else boolSystem cpExe $ params ++ [File src, File dest]
   where
-	params
-		| BuildInfo.cp_reflink_supported =
-			Param "--reflink=auto" : copyMetaDataParams meta
-		| otherwise = copyMetaDataParams meta
+	params = copyMetaDataParams meta
 
 {- When a filesystem supports CoW (and cp does), uses it to make
  - an efficient copy of a file. Otherwise, returns False. -}
 copyCoW :: CopyMetaData -> FilePath -> FilePath -> IO Bool
 copyCoW meta src dest
-	| BuildInfo.cp_reflink_supported = do
+	| reflinkSupported = do
 		void $ tryIO $ removeFile dest
 		-- When CoW is not supported, cp will complain to stderr,
 		-- so have to discard its stderr.
 		ok <- catchBoolIO $ withNullHandle $ \nullh ->
-			let p = (proc "cp" $ toCommand $ params ++ [File src, File dest])
+			let p = (proc cpExe $ toCommand $ params ++ [File src, File dest])
 				{ std_out = UseHandle nullh
 				, std_err = UseHandle nullh
 				}
@@ -70,7 +98,7 @@ copyCoW meta src dest
 		return ok
 	| otherwise = return False
   where
-	params = Param "--reflink=always" : copyMetaDataParams meta
+	params = Param reflinkParam : copyMetaDataParams meta
 
 {- Create a hard link if the filesystem allows it, and fall back to copying
  - the file. -}

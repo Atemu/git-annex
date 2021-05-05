@@ -294,6 +294,10 @@ Flag HttpClientRestricted
   Description: Build with http-client-restricted library (rather than vendored copy)
   Default: True
 
+Flag SystemCP
+  Description: Use macOS' /bin/cp instead of the cp in your $PATH (needed for reflink copies on OSX)
+  Default: True
+
 source-repository head
   type: git
   location: git://git-annex.branchable.com/
@@ -605,6 +609,9 @@ Executable git-annex
   
   if flag(DebugLocks)
     CPP-Options: -DDEBUGLOCKS
+
+  if flag(SystemCP) && os(darwin)
+    CPP-Options: -DWITH_SYSTEMCP
 
   Other-Modules:
     Annex

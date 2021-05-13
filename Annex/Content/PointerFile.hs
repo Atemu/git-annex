@@ -19,7 +19,6 @@ import Utility.InodeCache
 import qualified Utility.RawFilePath as R
 #if ! defined(mingw32_HOST_OS)
 import Utility.Touch
-import System.Posix.Files (modificationTimeHiRes)
 #endif
 
 {- Populates a pointer file with the content of a key. 

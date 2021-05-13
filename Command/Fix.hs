@@ -21,7 +21,6 @@ import qualified Utility.RawFilePath as R
 
 #if ! defined(mingw32_HOST_OS)
 import Utility.Touch
-import System.Posix.Files
 #endif
 
 cmd :: Command

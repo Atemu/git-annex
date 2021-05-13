@@ -54,8 +54,6 @@ import Data.Time.Clock.POSIX
 
 #ifdef mingw32_HOST_OS
 import Data.Word (Word64)
-#else
-import System.Posix.Files
 #endif
 
 data InodeCachePrim = InodeCachePrim FileID FileSize MTime
